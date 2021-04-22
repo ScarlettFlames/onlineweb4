@@ -21,7 +21,9 @@ from django.views import View
 from django_filters.rest_framework import DjangoFilterBackend
 from googleapiclient.errors import HttpError
 from oauth2_provider.models import AccessToken
-from rest_framework import filters, mixins, permissions, response, viewsets
+from rest_framework import filters, mixins, permissions, response, viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from watson import search as watson
 
 from apps.approval.forms import FieldOfStudyApplicationForm
@@ -42,6 +44,7 @@ from apps.marks.models import Mark, MarkRuleSet, Suspension
 from apps.payment.models import PaymentDelay, PaymentRelation, PaymentTransaction
 from apps.profiles.filters import PublicProfileFilter
 from apps.profiles.forms import (
+
     InternalServicesForm,
     PositionForm,
     PrivacyForm,
@@ -720,6 +723,29 @@ class ProfileViewSet(viewsets.ViewSet):
         if serializer.is_valid(raise_exception=True):
             serializer.save(user=user)
             return response.Response(serializer.data)
+
+    @action(detail=False, methods=["POST"], url_path="create-gsuite")
+    def create_gsuite(self, request, pk=None):
+        """
+        Create a G Suite account.
+        """
+        try:
+            create_g_suite_account(request.user)
+            return Response({"message": "Opprettet en G Suite konto til deg. Sjekk primærepostadressen din MAIL for instruksjoner."}, status=status.HTTP_201_CREATED)
+        except HttpError as err:
+             if err.resp.status == 409:
+                return Response({"message": "Det finnes allerede en brukerkonto med dette brukernavnet i G Suite. Dersom du mener det er galt, ta kontakt med dotkom."})
+             else:
+                return Response({"message": "Noe gikk galt. Vennligst ta kontakt med dotkom."})
+
+        return Response(data=None, status=status.HTTP_200_OK)
+
+    @action(detail=False, methods=["POST"], url_path="reset-gsuite")
+    def reset_gsuite(self, request, pk=None):
+        """
+        Reset G Suite account password.
+        """
+        return Response(data=None, status=status.HTTP_200_OK)
 
 
 class UserEmailAddressesViewSet(mixins.ListModelMixin, viewsets.GenericViewSet):
